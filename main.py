@@ -1,49 +1,83 @@
-import os
 import platform
-import subprocess
 import socket
-from platform import architecture
-
 import psutil
 import cpuinfo
 import GPUtil
 
-def get_GPU_info():
-    gpus = GPUtil.getGPUs()
-    if not gpus:
-        return "No GPU"
-    return "\n".join([f"GPU: {gpu.name} ({gpu.memoryTotal}) MB" for gpu in gpus])
 
-def get_system_info():
-    hostname = socket.gethostname()
-    system = platform.system()
-    architecture = platform.architecture()
-    kernel = platform.release()
-    compiler = platform.python_compiler()
-    cpu = cpuinfo.get_cpu_info()["brand_raw"]
-    cores = psutil.cpu_count(logical=True)
-    memory = round(psutil.virtual_memory().total / (1024 ** 3))
-    disk = round(psutil.disk_usage('/').total / (1024 ** 3))
+class Hardware:
+    def __init__(self, name):
+        self.name = name
 
-    return f"""
------System info-----
+    def get_info(self):
+        self = self
 
-Hostname: {hostname}
-System: {system} {architecture}
-Kernel: {kernel}
-Compiler: {compiler}
-CPU: {cpu} ({cores} Core)
-Memory: {memory} GB
-HDD: {disk} GB
+class CPU(Hardware):
+    def __init__(self):
+        super().__init__("CPU")
+        self.brand = cpuinfo.get_cpu_info()["brand_raw"]
+        self.cores = psutil.cpu_count(logical=False)
+        self.usage = psutil.cpu_percent(interval=1)
 
------GPU-----
-{get_GPU_info()}
+    def get_info(self):
+        return f"{self.name}: {self.brand}, Cores: {self.cores}, Usage: {self.usage}%"
 
------Usage-----
+class GPU(Hardware):
+    def __init__(self):
+        super().__init__("GPU")
+        self.gpus = GPUtil.getGPUs()
 
-RAM used : {round(psutil.virtual_memory().used / (1024 ** 3))} GB / {memory} GB ( {psutil.virtual_memory().percent} % )
-HDD used : {round(psutil.disk_usage('/').used / (1024 ** 3))} GB / {disk} GB ( {psutil.disk_usage('/').percent} % )
+    def get_info(self):
+        if not self.gpus:
+            return "No GPU, superior race!"
+        return "\n".join([f"{gpu.name} ({gpu.memoryTotal} MB" for gpu in self.gpus])
 
-"""
+class RAM(Hardware):
+    def __init__(self):
+        super().__init__("RAM")
+        self.total_memory = round(psutil.virtual_memory().total / (1024 ** 3), 2)
+        self.used_memory = round(psutil.virtual_memory().used / (1024 ** 3), 2)
 
-print(get_system_info())
+    def get_info(self):
+        return f"{self.name}: {self.used_memory} GB / {self.total_memory} GB"
+
+class HDD(Hardware):
+    def __init__(self):
+        super().__init__("HDD")
+        self.partitions = psutil.disk_partitions()
+        self.total_storage = sum(psutil.disk_usage(part.mountpoint).total for part in self.partitions if part.fstype)
+        self.used_storage = sum(psutil.disk_usage(part.mountpoint).used for part in self.partitions if part.fstype)
+        self.total_storage_gb = round(self.total_storage / (1024 ** 3), 2)
+        self.used_storage_gb = round(self.used_storage / (1024 ** 3), 2)
+
+    def get_info(self):
+        return f"{self.name}: {self.used_storage_gb} GB / {self.total_storage_gb} GB"
+
+class SystemInfo:
+    def __init__(self):
+        self.hostname = socket.gethostname()
+        self.system = platform.system()
+        self.architecture = platform.architecture()
+        self.kernel = platform.release()
+        self.compiler = platform.python_compiler()
+
+    def get_info(self):
+        return (f"Hostname: {self.hostname}\n"
+                f"System: {self.system}\n"
+                f"Architecture: {self.architecture}\n"
+                f"Kernel: {self.kernel}\n"
+                f"Python Compiler: {self.compiler}"
+                f" \n")
+
+if __name__ == "__main__":
+    cpu = CPU()
+    gpu = GPU()
+    ram = RAM()
+    hdd = HDD()
+    system = SystemInfo()
+
+    print(system.get_info())
+    print(gpu.get_info())
+    print(cpu.get_info())
+    print(ram.get_info())
+    print(hdd.get_info())
