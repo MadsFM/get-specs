@@ -62,7 +62,8 @@ class SystemInfo:
         self.compiler = platform.python_compiler()
 
     def get_info(self):
-        return (f"Hostname: {self.hostname}\n"
+        return (f"\n"
+                f"Hostname: {self.hostname}\n"
                 f"System: {self.system}\n"
                 f"Architecture: {self.architecture}\n"
                 f"Kernel: {self.kernel}\n"
